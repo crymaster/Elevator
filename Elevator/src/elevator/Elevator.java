@@ -5,13 +5,29 @@
 package elevator;
 
 import java.util.LinkedList;
+import javafx.animation.Interpolator;
+import javafx.animation.PathTransition;
+import javafx.scene.image.Image;
+import javafx.scene.image.ImageView;
+import javafx.scene.shape.LineTo;
+import javafx.scene.shape.MoveTo;
+import javafx.scene.shape.Path;
+import javafx.util.Duration;
 /**
  *
  * @author HoangSon
  */
 public class Elevator implements Runnable{
+    public static final double INIT_X = 740;
+    public static final double INIT_Y = 401;
+    public static final double X_BASE = 785;
+    public static final double Y_BASE = 457;
+    public static final double FLOOR_GAP = 103;
+    ImageView elevatorView;
+    double currentY;
     int currentFloor;
     int direction;
+    int capacity;
     int status;                         //0:idle;1:going;2:stop for passenger
     Floor[] floors;
     private LinkedList<Order> onOperating;
@@ -25,27 +41,32 @@ public class Elevator implements Runnable{
         this.currentFloor = currentFloor;
         this.direction = 0;
         this.status = 0;
-       this.floors = floors;
+        this.floors = floors;
+        this.capacity = 0;
+        currentY = Y_BASE+currentFloor*FLOOR_GAP;
         onOperating = new LinkedList<>();
-       onWaiting = new LinkedList<>();
+        onWaiting = new LinkedList<>();
     }
            
-    private void idle(){
-        System.out.println("Elevator is idle at " + (currentFloor+1) + "F");
+    private synchronized void idle(){
+        if(status==0){
+            try{
+                System.out.println("Elevator is idle at "+(currentFloor+1)+"F");
+                wait();
+            }catch(InterruptedException ex){
+                ex.printStackTrace();
+            }
+        }
+        notify();
     }
     
-    private synchronized void move(){
+    private void move(){
         //Nothing to operate
         if(onOperating.isEmpty()){
             //No floors is waiting
             if(onWaiting.isEmpty()){
                 status = 0;
                 idle();
-                try{
-                    wait();
-                }catch(InterruptedException ex){
-                    ex.printStackTrace();
-                }
             }
             //Floors are waiting
            else{
@@ -60,22 +81,50 @@ public class Elevator implements Runnable{
                 return;
             }
             currentFloor += direction;
+            Path elevatorPath = new Path();        
+            
+            elevatorPath.getElements().add(new MoveTo(X_BASE, currentY));
             if(direction>0){
+                currentY -= FLOOR_GAP;
+                elevatorPath.getElements().add(new LineTo(X_BASE, currentY));
+                PathTransition pathTran = new PathTransition(Duration.seconds(2), elevatorPath, elevatorView);
+                pathTran.setInterpolator(Interpolator.LINEAR);
+                pathTran.playFromStart();
                 System.out.println("Up " + (currentFloor +1)+"F");
+                try{
+                    Thread.currentThread().sleep(2000);
+                }catch(InterruptedException e){
+                    e.printStackTrace();
+                }
             }
             else if(direction<0){
+                currentY += FLOOR_GAP;
+                elevatorPath.getElements().add(new LineTo(X_BASE, currentY));
+                PathTransition pathTran = new PathTransition(Duration.seconds(2), elevatorPath, elevatorView);
+                pathTran.playFromStart();
                 System.out.println("Down " + (currentFloor +1)+"F");
-            }
-            if(currentFloor == onOperating.peek().floor){
-                floors[currentFloor].openDoor();
-                floors[currentFloor].notifyGoingOut();
-                notifyFloor(onOperating.remove().direction);
-                waitForPerson();
+                try{
+                    Thread.currentThread().sleep(2000);
+                }catch(InterruptedException e){
+                    e.printStackTrace();
+                }
             }
         }
     }
+    
+   private void checkToStop(){
+       if(currentFloor == onOperating.peek().floor){    
+            notifyFloor(onOperating.remove().direction);
+            waitForPerson();
+        }
+   }
    
    private void notifyFloor(int direction){
+        floors[currentFloor].openDoor();
+        if(capacity>0){
+            floors[currentFloor].notifyGoingOut();
+            floors[currentFloor].notifyOutDone();
+        }
         floors[currentFloor].notifyWaitingPerson(direction);
     }
     
@@ -85,7 +134,13 @@ public class Elevator implements Runnable{
     
     private void rearrange(){
         onOperating.add(onWaiting.remove());
-        direction = -direction;
+        if(currentFloor>onOperating.peek().floor){
+            direction = -1;
+        }
+        else{
+            direction = 1;
+        }
+        
         int j = -1;
         int direction;
         int floor;
@@ -250,7 +305,8 @@ public class Elevator implements Runnable{
            }else{
                 this.direction = 0;
            }
-            move();
+            status = 1;
+            idle();
             return;
         }
         //Person's direction >< elevator's direction
@@ -293,20 +349,26 @@ public class Elevator implements Runnable{
     void addPerson(Person person){
         person.setFloor(floors[person.dest]);
    }
-    
+  
+    ImageView getElevatorView(){
+        elevatorView = new ImageView(new Image(getClass().getResourceAsStream("images/elevator.png")));
+        elevatorView.setX(INIT_X);
+        elevatorView.setY(INIT_Y);
+        return elevatorView;
+    }
    @Override
    public void run() {
         while(true){
             move();
-            try{
-               Thread.currentThread().sleep(2000);
-           
-            }catch(InterruptedException ex){
-               ex.printStackTrace();
-           }
+            checkToStop();
+//            try{
+//               Thread.currentThread().sleep(2000);
+//           
+//            }catch(InterruptedException ex){
+//               ex.printStackTrace();
+//           }
        }
     }
     
     
 }
-

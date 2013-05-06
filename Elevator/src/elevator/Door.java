@@ -11,6 +11,9 @@ package elevator;
 public class Door {
     boolean status;
     
+    Door(){
+        status = false;
+    }
     void open(){
         status = true;
     }

@@ -42,8 +42,9 @@ public class Person implements Runnable{
    }
     
     private void selectFloor(){
-       System.out.println("Person " + no + " selects "+(dest+1)+"F");
+        System.out.println("Selecting");
         floor.sendSelectedFloor(dest);
+        System.out.println("Person " + no + " selects "+(dest+1)+"F");
    }
     
     private void waitForElevator(){
@@ -52,6 +53,7 @@ public class Person implements Runnable{
     }
     
     private void enter(){
+        System.out.println("Waiting");
         floor.allowToEnter(direction);
         System.out.println("Person " + no + " enters the elevator");
     }

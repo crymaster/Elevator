@@ -22,9 +22,8 @@ public class Building {
             floors[i] = new Floor(i);
             floors[i].setElevator(elv);
         }
-        new Thread(elv).start();
     }
-
+    
     public Building(int numberOfFloor, Elevator elv) {
         this.elv = elv;
         floors = new Floor[numberOfFloor];
@@ -33,7 +32,6 @@ public class Building {
             floors[i].setElevator(elv);
         }
         elv.floors = floors;
-        new Thread(elv).start();
     }
     
     public void setElevator(Elevator elv){
@@ -64,8 +62,17 @@ public class Building {
         floors[currentFloor-1].addPerson(person);
     }
     
-    public ImageView loadImageView(){
+    public ImageView loadBuildingView(){
         Image buildingImage = new Image(getClass().getResourceAsStream("images/building.png"));
-        return new ImageView(buildingImage);
+        ImageView buildingView = new ImageView(buildingImage);
+        return buildingView;
+    }
+    
+    public ImageView loadElevator(){
+        return elv.getElevatorView();
+    }
+    
+    public void startElevator(){
+        new Thread(elv).start();
     }
 }

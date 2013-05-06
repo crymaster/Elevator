@@ -19,9 +19,10 @@ public class Floor {
     LinkedList<Person> personUpList;
     LinkedList<Person> personDownList;
     private Elevator elv;
-    private EnterPermission upPermission;
-    private EnterPermission downPermisson;
-    
+    private Permission upPermission;
+    private Permission downPermisson;
+    private Wait outDone;
+    private Wait inDone;
     public Floor(int no) {
         this.no = no;
         upButton = false;
@@ -31,8 +32,10 @@ public class Floor {
         personUpList = new LinkedList<>();
         personDownList = new LinkedList<>();
         door = new Door();
-        upPermission = new EnterPermission();
-        downPermisson = new EnterPermission();
+        upPermission = new Permission();
+        downPermisson = new Permission();
+        outDone = new Wait();
+        inDone = new Wait();
     }
     
     void addPerson(Person person){
@@ -51,64 +54,74 @@ public class Floor {
             //Up button has not been pressed
             if(!upButton){
                 upButton = true;
-                System.out.println(no+1+"F Up pressed");
                 elv.pushed(no,button);
+                System.out.println(no+1+"F Up pressed");
             }
         }
         //Signal go down
         else{
             if(!downButton){
                 downButton = true;
-                System.out.println(no+1+"F Down pressed");
                 elv.pushed(no,button);
+                System.out.println(no+1+"F Down pressed");
             }
         }
     }
     
     void openDoor(){
-        System.out.println("Door is opened");
         door.open();
+        System.out.println("Door is opened");
     }
     
     void closeDoor(){
-        System.out.println("Door is closed");
         door.close();
+        System.out.println("Door is closed");
     }
     
     void sendSelectedFloor(int floor){
         elv.arrangeSelectedFloor(floor);
+        System.out.println("Selected");
         if(floor>no){
            elv.addPerson(personUpList.remove());
            if(personUpList.isEmpty()){
-               door.close();
+               System.out.println("I'm last");
+               closeDoor();
                notifyElevator();
            } 
         }
         else{
             elv.addPerson(personDownList.remove());
             if(personDownList.isEmpty()){
-               door.close();
+               closeDoor();
                notifyElevator();
            }
         }
     }
     
-    synchronized void notifyElevator(){
-        if(door.status){
-            try{
-                wait(2000);
-            }
-            catch(InterruptedException e){
-                e.printStackTrace();
-            }
-        }
-        notify();
+    void notifyElevator(){
+        inDone.waitFor(!door.status, 1000);
+//        if(door.status){
+//            try{
+//                wait(1000);
+//                System.out.println("Elevator notified");
+//            }
+//            catch(InterruptedException e){
+//                e.printStackTrace();
+//            }
+//        }
+//        else{
+//            System.out.println("I notifies");
+//        }
+//        notify();
     }
     
     synchronized void notifyGoingOut(){
         if(!door.status){
             try{
                 wait();
+                if(--elv.capacity==0){
+                    notifyOutDone();
+                }
             }
             catch(InterruptedException e){
                 e.printStackTrace();
@@ -117,32 +130,43 @@ public class Floor {
         notify();
     }
     
+    void notifyOutDone(){
+        if(elv.capacity>0){
+            outDone.waitFor(false,1000);
+        }
+        else{
+            outDone.waitFor(true,0);
+        }
+        
+    }
+    
     void notifyWaitingPerson(int direction){
         if(direction>0){
             availableUp = true;
-            upPermission.allowToEnter(availableUp);
+            upPermission.allow(availableUp);
         }
         else{
             availableDown = true;
-            downPermisson.allowToEnter(availableDown);
+            downPermisson.allow(availableDown);
         }
     }
     
     void allowToEnter(int direction){
         if(direction>0){
-            upPermission.allowToEnter(availableUp);
+            upPermission.allow(availableUp);
         }
         else{
-           downPermisson.allowToEnter(availableDown);
+            downPermisson.allow(availableDown);
         }
+        elv.capacity++;
     }
         
     void setElevator(Elevator elv){
         this.elv = elv;
     }
     
-    class EnterPermission{
-        synchronized void allowToEnter(boolean available){
+    class Permission{
+        synchronized void allow(boolean available){
             if(!available){                
                 try{
                     wait();
@@ -154,5 +178,17 @@ public class Floor {
         }
     }
     
+    class Wait{
+        synchronized void waitFor(boolean available,long milis){
+            if(!available){                
+                try{
+                    wait(milis);
+                }catch(InterruptedException ex){
+                    ex.printStackTrace();
+                }
+            }
+            notify();
+        }
+    }
     
 }
